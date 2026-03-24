@@ -150,6 +150,23 @@ class WelcomeScreen:
         for line in panel_lines:
             print(self.center_text(line))
 
+    def print_custom_panel(
+        self,
+        title: str,
+        lines: list[str],
+        panel_width: int,
+        align: str = "left",
+    ):
+        """Print a centered custom-width panel."""
+        panel_lines = self.build_panel_lines(
+            title,
+            lines,
+            panel_width,
+            align=align,
+        )
+        for line in panel_lines:
+            print(self.center_text(line))
+
     def print_side_by_side_panels(
         self,
         left_title: str,
@@ -157,7 +174,7 @@ class WelcomeScreen:
         right_title: str,
         right_lines: list[str],
     ):
-        """Print two panels side by side."""
+        """Print two tighter panels side by side with left-aligned content."""
         gap = " " * 4
         panel_width = (self.width - 4) // 2
 
@@ -165,7 +182,7 @@ class WelcomeScreen:
             left_title,
             left_lines,
             panel_width,
-            align="center",
+            align="left",
         )
         right_panel = self.build_panel_lines(
             right_title,
@@ -503,48 +520,46 @@ class WelcomeScreen:
 
     # ----- Mission Briefing -----
     def mission_briefing(self, size, ships):
-        """Show briefing and tactical console in boxed arcade layout."""
+        """Show tighter premium-style mission briefing."""
         max_row = chr(64 + size)
 
         left_lines = [
-            (
-                Fore.YELLOW
-                + Style.BRIGHT
-                + "INCOMING TRANSMISSION"
-                + Style.RESET_ALL
-            ),
             "",
-            Fore.CYAN + "Welcome, Commander." + Style.RESET_ALL,
-            "Enemy fleets lurk beyond the horizon...",
-            f"Tactical grid: {size}x{size} sectors (A-{max_row}, 1-{size})",
-            f"Fleet deployed: {ships} battleships",
-            "Enemy ships are hidden.",
-            "Hunt them down with precision fire!",
+            "  " + Fore.CYAN + "Welcome, Commander." + Style.RESET_ALL,
+            "  Enemy fleets lurk beyond the horizon.",
+            f"  Tactical grid: {size}x{size} sectors (A-{max_row}, 1-{size})",
+            f"  Fleet deployed: {ships} battleships",
+            "  Enemy ships are hidden.",
+            "  Hunt them down with precision fire.",
+            "",
         ]
 
         right_lines = [
+            "",
             (
-                Fore.MAGENTA
+                "  "
+                + Fore.MAGENTA
                 + Style.BRIGHT
                 + "TACTICAL ORDERS"
                 + Style.RESET_ALL
             ),
-            "",
-            "- Enter strike coordinates like A1, C7, or H8",
-            f"- {HIT}  Direct hit on enemy ship",
-            f"- {MISS}  Splash! Shot missed",
-            f"- {WATER}  Untouched waters",
-            f"- {SHIP_CHAR}  Your ship positions (your radar only)",
+            "  - Enter strike coordinates like A1, C7, or H8",
+            f"  - {HIT}  Direct hit on enemy ship",
+            f"  - {MISS}  Splash! Shot missed",
+            f"  - {WATER}  Untouched waters",
+            f"  - {SHIP_CHAR}  Your ship positions (your radar only)",
             "",
             (
-                Fore.YELLOW
+                "  "
+                + Fore.YELLOW
                 + Style.BRIGHT
                 + "RULES OF ENGAGEMENT"
                 + Style.RESET_ALL
             ),
-            "- Turns alternate - one strike per side.",
-            "- Victory: Destroy the enemy fleet.",
-            "- Defeat: All your ships are sunk.",
+            "  - Turns alternate - one strike per side.",
+            "  - Victory: Destroy the enemy fleet.",
+            "  - Defeat: All your ships are sunk.",
+            "",
         ]
 
         clear_screen()
@@ -573,7 +588,12 @@ class WelcomeScreen:
                 + Style.RESET_ALL
             ),
         ]
-        self.print_panel("DEPLOYMENT", deploy_lines, align="center")
+        self.print_custom_panel(
+            "DEPLOYMENT",
+            deploy_lines,
+            panel_width=76,
+            align="center",
+        )
 
         input()
         clear_screen()
@@ -862,7 +882,7 @@ if __name__ == "__main__":
     ]
 
     ship_art = r"""
-⣠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+    ⣠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠰⠶⢿⡶⠦⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⢀⣀⣿⣿⣿⣿⣿⣿⡇⢀⠀⢀⡀⠀⣀⣀⣠⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠉⠻⠿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣶⣿⣿⣶⣶⣾⣧⣤⣴⣆⣀⢀⣤⡄⠀⠀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
