@@ -43,7 +43,12 @@ class WelcomeScreen:
         pad = max(0, (self.width - clean_width) // 2)
         return " " * pad + color + text + Style.RESET_ALL
 
-    def pad_line(self, text: str, target_width: int, align: str = "left") -> str:
+    def pad_line(
+        self,
+        text: str,
+        target_width: int,
+        align: str = "left",
+    ) -> str:
         """Pad one line to target width."""
         current = self.visible_width(text)
 
@@ -130,7 +135,12 @@ class WelcomeScreen:
 
     def print_panel(self, title: str, lines: list[str], align: str = "left"):
         """Print a centered full-width panel."""
-        panel_lines = self.build_panel_lines(title, lines, self.width, align=align)
+        panel_lines = self.build_panel_lines(
+            title,
+            lines,
+            self.width,
+            align=align,
+        )
         for line in panel_lines:
             print(self.center_text(line))
 
@@ -206,7 +216,12 @@ class WelcomeScreen:
         button = "[ DEPLOY FLEET ]"
 
         if selected:
-            return Style.BRIGHT + Fore.GREEN + "[ PRESS ENTER TO START ]" + Style.RESET_ALL
+            return (
+                Style.BRIGHT
+                + Fore.GREEN
+                + "[ PRESS ENTER TO START ]"
+                + Style.RESET_ALL
+            )
         return Fore.WHITE + button + Style.RESET_ALL
 
     def read_key(self) -> str:
@@ -306,35 +321,65 @@ class WelcomeScreen:
         setup_lines = [
             "",
             self.pad_line(
-                Fore.WHITE + "Choose your battlefield settings before deployment." + Style.RESET_ALL
-                ,
+                (
+                    Fore.WHITE
+                    + "Choose your battlefield settings before deployment."
+                    + Style.RESET_ALL
+                ),
                 self.width - 2,
                 align="center",
             ),
             "",
-            self.pad_line(self.selector_row("GRID SIZE", 8, 15, grid_text, selected == 0), self.width - 2, align="center"),
-            "",
-            self.pad_line(self.selector_row("NUMBER OF SHIPS", 1, 5, ships_text, selected == 1), self.width - 2, align="center"),
-            "",
-            self.pad_line(self.action_row("DEPLOY FLEET", selected == 2), self.width - 2, align="center"),
+            self.pad_line(
+                self.selector_row(
+                    "GRID SIZE",
+                    8,
+                    15,
+                    grid_text,
+                    selected == 0,
+                ),
+                self.width - 2,
+                align="center",
+            ),
             "",
             self.pad_line(
-                Fore.GREEN + "Use ↑/↓ to select an option." + Style.RESET_ALL
-                ,
+                self.selector_row(
+                    "NUMBER OF SHIPS",
+                    1,
+                    5,
+                    ships_text,
+                    selected == 1,
+                ),
+                self.width - 2,
+                align="center",
+            ),
+            "",
+            self.pad_line(
+                self.action_row("DEPLOY FLEET", selected == 2),
+                self.width - 2,
+                align="center",
+            ),
+            "",
+            self.pad_line(
+                Fore.GREEN + "Use ↑/↓ to select an option." + Style.RESET_ALL,
                 self.width - 2,
                 align="center",
             ),
             self.pad_line(
-                Fore.GREEN
-                + "Use ←/→ or number keys to change the selected value."
-                + Style.RESET_ALL
-                ,
+                (
+                    Fore.GREEN
+                    + "Use ←/→ or number keys to change the selected value."
+                    + Style.RESET_ALL
+                ),
                 self.width - 2,
                 align="center",
             ),
             self.pad_line(
-                Fore.GREEN + "Press Enter to confirm the selected option." + Style.RESET_ALL
-                ,
+                (
+                    Fore.GREEN
+                    + "Press Enter to confirm the selected option."
+                    + Style.RESET_ALL
+                ),
                 self.width - 2,
                 align="center",
             ),
@@ -361,7 +406,12 @@ class WelcomeScreen:
         message = ""
 
         while True:
-            self.render_setup_screen(grid_text, ships_text, selected, message)
+            self.render_setup_screen(
+                grid_text,
+                ships_text,
+                selected,
+                message,
+            )
             key = self.read_key()
             message = ""
 
@@ -423,7 +473,10 @@ class WelcomeScreen:
                         selected = 0
                         continue
 
-                    if not (ships_text.isdigit() and 1 <= int(ships_text) <= 5):
+                    if not (
+                        ships_text.isdigit()
+                        and 1 <= int(ships_text) <= 5
+                    ):
                         message = "NUMBER OF SHIPS must be between 1 and 5."
                         selected = 1
                         continue
@@ -438,7 +491,7 @@ class WelcomeScreen:
                         grid_text += key
                     else:
                         grid_text = key
-            
+
                 elif selected == 1:
                     if ships_text in ("3", ""):
                         ships_text = key
@@ -452,7 +505,12 @@ class WelcomeScreen:
         max_row = chr(64 + size)
 
         left_lines = [
-            Fore.YELLOW + Style.BRIGHT + "INCOMING TRANSMISSION" + Style.RESET_ALL,
+            (
+                Fore.YELLOW
+                + Style.BRIGHT
+                + "INCOMING TRANSMISSION"
+                + Style.RESET_ALL
+            ),
             "",
             Fore.CYAN + "Welcome, Commander." + Style.RESET_ALL,
             "Enemy fleets lurk beyond the horizon...",
@@ -463,7 +521,12 @@ class WelcomeScreen:
         ]
 
         right_lines = [
-            Fore.MAGENTA + Style.BRIGHT + "TACTICAL ORDERS" + Style.RESET_ALL,
+            (
+                Fore.MAGENTA
+                + Style.BRIGHT
+                + "TACTICAL ORDERS"
+                + Style.RESET_ALL
+            ),
             "",
             "- Enter strike coordinates like A1, C7, or H8",
             f"- {HIT}  Direct hit on enemy ship",
@@ -471,7 +534,12 @@ class WelcomeScreen:
             f"- {WATER}  Untouched waters",
             f"- {SHIP_CHAR}  Your ship positions (your radar only)",
             "",
-            Fore.YELLOW + Style.BRIGHT + "RULES OF ENGAGEMENT" + Style.RESET_ALL,
+            (
+                Fore.YELLOW
+                + Style.BRIGHT
+                + "RULES OF ENGAGEMENT"
+                + Style.RESET_ALL
+            ),
             "- Turns alternate - one strike per side.",
             "- Victory: Destroy the enemy fleet.",
             "- Defeat: All your ships are sunk.",
@@ -491,9 +559,17 @@ class WelcomeScreen:
         print()
 
         deploy_lines = [
-            "Stay sharp, Commander. The fate of the fleet rests in your hands.",
+            (
+                "Stay sharp, Commander. The fate of the fleet "
+                "rests in your hands."
+            ),
             "",
-            Fore.GREEN + Style.BRIGHT + "Press Enter to deploy your fleet..." + Style.RESET_ALL,
+            (
+                Fore.GREEN
+                + Style.BRIGHT
+                + "Press Enter to deploy your fleet..."
+                + Style.RESET_ALL
+            ),
         ]
         self.print_panel("DEPLOYMENT", deploy_lines, align="center")
 
@@ -537,7 +613,10 @@ def format_cell(symbol: str) -> str:
     return pad_visual(symbol, CELL_VISUAL)
 
 
-def build_board_block(title_text: str, grid_rows: list[list[str]]) -> list[str]:
+def build_board_block(
+    title_text: str,
+    grid_rows: list[list[str]],
+) -> list[str]:
     """Build one framed board with title, numbers, rows, and border."""
     size = len(grid_rows)
     inner_width = 3 + (size * CELL_VISUAL)
@@ -656,7 +735,8 @@ class BattleshipGame:
         c = int(digits) - 1
         if not (0 <= r < self.size and 0 <= c < self.size):
             self.player_msg = (
-                f"❌ Coordinates must be A-{chr(64 + self.size)} + 1-{self.size}."
+                f"❌ Coordinates must be "
+                f"A-{chr(64 + self.size)} + 1-{self.size}."
             )
             return
 
@@ -668,10 +748,16 @@ class BattleshipGame:
         if (r, c) in self.enemy_ships:
             self.enemy_view[r][c] = HIT
             self.enemy_ships.remove((r, c))
-            self.player_msg = f"💥 Direct Hit! Enemy ship damaged at {row_letter}{c + 1}!"
+            self.player_msg = (
+                f"💥 Direct Hit! Enemy ship damaged at "
+                f"{row_letter}{c + 1}!"
+            )
         else:
             self.enemy_view[r][c] = MISS
-            self.player_msg = f"💦 Torpedo missed at {row_letter}{c + 1}, enemy evaded!"
+            self.player_msg = (
+                f"💦 Torpedo missed at {row_letter}{c + 1}, "
+                "enemy evaded!"
+            )
 
     def _enemy_turn(self):
         """Enemy AI randomly fires at player fleet."""
@@ -698,7 +784,9 @@ class BattleshipGame:
         enemy_left = len(self.enemy_ships)
         player_left = len(self.player_ships)
 
-        player_bar = " ".join([SHIP_CHAR] * player_left) if player_left else "-"
+        player_bar = (
+            " ".join([SHIP_CHAR] * player_left) if player_left else "-"
+        )
         enemy_bar = " ".join([SHIP_CHAR] * enemy_left) if enemy_left else "-"
 
         if current_turn == "Player":
