@@ -28,6 +28,8 @@ class WelcomeScreen:
     # ----- Utility Functions -----
     def strip_ansi(self, text: str) -> str:
         """Remove ANSI escape codes for alignment math."""
+        # Terminal colors add hidden characters, so we remove them before
+        # measuring string width.
         ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
         return ansi_escape.sub("", text)
 
@@ -50,6 +52,8 @@ class WelcomeScreen:
         align: str = "left",
     ) -> str:
         """Pad one line to target width."""
+        # This keeps text aligned neatly inside panels, even when some lines
+        # use colors or emojis.
         current = self.visible_width(text)
 
         if current >= target_width:
@@ -89,6 +93,8 @@ class WelcomeScreen:
         title_color: str = Fore.CYAN,
     ) -> list[str]:
         """Build one panel using board-style borders."""
+        # A panel is the reusable "boxed UI" used for the ship art, setup
+        # menu, mission briefing, and deployment messages.
         inner_width = panel_width - 2
         label = f" {title} "
         label_width = self.visible_width(label)
@@ -186,47 +192,64 @@ class WelcomeScreen:
         value_text: str,
         selected: bool = False,
     ) -> str:
-        """Render one setup row aligned for the inner mission panel."""
+        """Render one compact setup row inside mission setup."""
         display_value = value_text if value_text else ""
         display_value = display_value[:3]
 
-        label_part = f"{label} ({min_value}-{max_value})".ljust(24)
+        # Each setup row uses the same fixed indent so the menu feels like
+        # one clean column inside the outer mission panel.
+        menu_indent = 12
+        marker = "▶" if selected else " "
+        label_part = f"{label} ({min_value}-{max_value})".ljust(22)
         value_box = f"[  {display_value:^3}  ]"
-        marker = "> " if selected else "  "
-        row = marker + label_part + "     " + value_box
 
         if selected:
             return (
-                Style.BRIGHT
+                " " * menu_indent
+                + Style.BRIGHT
                 + Fore.CYAN
-                + marker
+                + f"{marker} "
                 + label_part
                 + Fore.YELLOW
-                + "     "
                 + value_box
                 + Style.RESET_ALL
             )
 
         return (
-            Fore.WHITE + row + Style.RESET_ALL
+            " " * menu_indent
+            + Fore.WHITE
+            + f"{marker} "
+            + label_part
+            + value_box
+            + Style.RESET_ALL
         )
 
     def action_row(self, label: str, selected: bool = False) -> str:
-        """Render the deploy button for the inner mission panel."""
+        """Render the deploy button in a cleaner centered style."""
+        # The action button is centered separately so it feels like a menu
+        # action rather than another value field.
         button = "[ DEPLOY FLEET ]"
+        active_button = "[ PRESS ENTER TO START ]"
+
+        inner_width = self.width - 2
+        shown = active_button if selected else button
+        left_pad = max(0, (inner_width - len(shown)) // 2)
 
         if selected:
             return (
-                Style.BRIGHT
+                " " * left_pad
+                + Style.BRIGHT
                 + Fore.GREEN
-                + "[ PRESS ENTER TO START ]"
+                + active_button
                 + Style.RESET_ALL
             )
-        return Fore.WHITE + button + Style.RESET_ALL
+        return " " * left_pad + Fore.WHITE + button + Style.RESET_ALL
 
     def read_key(self) -> str:
         """Read one key without showing an extra input prompt."""
         if os.name == "nt":
+            # Windows arrow keys come as two characters, so we translate them
+            # into simple names like "up" and "left".
             key = msvcrt.getwch()
 
             if key in ("\x00", "\xe0"):
@@ -250,6 +273,8 @@ class WelcomeScreen:
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
+            # On Unix systems we switch to raw mode so one key press can be
+            # read immediately without waiting for Enter.
             tty.setraw(fd)
             key = sys.stdin.read(1)
 
@@ -314,75 +339,42 @@ class WelcomeScreen:
         selected: int,
         message: str = "",
     ):
-        """Render mission setup with centered content and no inner frame."""
+        """Render mission setup with tighter, cleaner alignment."""
+        # This redraws the full setup screen every time the player changes a
+        # value, which makes the menu feel interactive.
         self.show_title()
         self.show_ship()
 
+        menu_indent = " " * 12
+
         setup_lines = [
             "",
-            self.pad_line(
-                (
-                    Fore.WHITE
-                    + "Choose your battlefield settings before deployment."
-                    + Style.RESET_ALL
-                ),
-                self.width - 2,
-                align="center",
-            ),
+            menu_indent
+            + Fore.WHITE
+            + "Choose your battlefield settings before deployment."
+            + Style.RESET_ALL,
             "",
-            self.pad_line(
-                self.selector_row(
-                    "GRID SIZE",
-                    8,
-                    15,
-                    grid_text,
-                    selected == 0,
-                ),
-                self.width - 2,
-                align="center",
+            self.selector_row(
+                "GRID SIZE",
+                8,
+                15,
+                grid_text,
+                selected == 0,
             ),
+            self.selector_row(
+                "NUMBER OF SHIPS",
+                1,
+                5,
+                ships_text,
+                selected == 1,
+            ),
+            self.action_row("DEPLOY FLEET", selected == 2),
             "",
-            self.pad_line(
-                self.selector_row(
-                    "NUMBER OF SHIPS",
-                    1,
-                    5,
-                    ships_text,
-                    selected == 1,
-                ),
-                self.width - 2,
-                align="center",
-            ),
-            "",
-            self.pad_line(
-                self.action_row("DEPLOY FLEET", selected == 2),
-                self.width - 2,
-                align="center",
-            ),
-            "",
-            self.pad_line(
-                Fore.GREEN + "Use ↑/↓ to select an option." + Style.RESET_ALL,
-                self.width - 2,
-                align="center",
-            ),
-            self.pad_line(
-                (
-                    Fore.GREEN
-                    + "Use ←/→ or number keys to change the selected value."
-                    + Style.RESET_ALL
-                ),
-                self.width - 2,
-                align="center",
-            ),
-            self.pad_line(
-                (
-                    Fore.GREEN
-                    + "Press Enter to confirm the selected option."
-                    + Style.RESET_ALL
-                ),
-                self.width - 2,
-                align="center",
-            ),
+            menu_indent
+            + Fore.GREEN
+            + "Use ↑/↓ to select, ←/→ or number keys to change, "
+            + "and Enter to confirm."
+            + Style.RESET_ALL,
             "",
         ]
 
@@ -400,12 +392,14 @@ class WelcomeScreen:
 
     def get_inputs(self):
         """Inline box editing inside mission setup."""
+        # These are editable text values shown in the setup menu.
         grid_text = "8"
         ships_text = "3"
         selected = 0
         message = ""
 
         while True:
+            # Render -> read one key -> update values -> render again.
             self.render_setup_screen(
                 grid_text,
                 ships_text,
@@ -431,6 +425,8 @@ class WelcomeScreen:
                 continue
 
             if key == "left":
+                # Left arrow decreases the selected value and wraps around
+                # when it reaches the minimum.
                 if selected == 0:
                     current = int(grid_text) if grid_text.isdigit() else 8
                     current = 15 if current <= 8 else current - 1
@@ -442,6 +438,8 @@ class WelcomeScreen:
                 continue
 
             if key == "right":
+                # Right arrow increases the selected value and wraps around
+                # when it reaches the maximum.
                 if selected == 0:
                     current = int(grid_text) if grid_text.isdigit() else 8
                     current = 8 if current >= 15 else current + 1
@@ -453,6 +451,8 @@ class WelcomeScreen:
                 continue
 
             if key == "enter":
+                # Enter either moves to the next field or starts the game,
+                # but only after validating the current values.
                 if selected == 0:
                     if grid_text.isdigit() and 8 <= int(grid_text) <= 15:
                         selected = 1
@@ -484,6 +484,8 @@ class WelcomeScreen:
                     return int(grid_text), int(ships_text)
 
             if len(key) == 1 and key.isdigit():
+                # Number keys let the player type values directly instead of
+                # only cycling with arrow keys.
                 if selected == 0:
                     if grid_text in ("8", ""):
                         grid_text = key
@@ -602,6 +604,8 @@ def strip_ansi(s: str) -> str:
 
 def pad_visual(s: str, width: int) -> str:
     """Pad text so visual width matches width (handles emoji)."""
+    # Emojis often take more than one terminal column, so normal len()
+    # is not accurate for board alignment.
     vis = wcswidth(strip_ansi(s))
     if vis < 0:
         vis = len(strip_ansi(s))
@@ -618,6 +622,8 @@ def build_board_block(
     grid_rows: list[list[str]],
 ) -> list[str]:
     """Build one framed board with title, numbers, rows, and border."""
+    # This turns a 2D grid into a printable board with column numbers and
+    # row letters like a classic Battleship display.
     size = len(grid_rows)
     inner_width = 3 + (size * CELL_VISUAL)
     lines = []
@@ -644,6 +650,8 @@ def build_board_block(
 
 def display_boards(enemy_view: list[list[str]], player_board: list[list[str]]):
     """Print enemy + player boards side-by-side."""
+    # The player sees both boards at once: enemy guesses on the left and
+    # their own fleet on the right.
     left_block = build_board_block(LEFT_TITLE, enemy_view)
     right_block = build_board_block(RIGHT_TITLE, player_board)
     for left_row, right_row in zip(left_block, right_block):
@@ -654,6 +662,8 @@ class BattleshipGame:
     """Main Battleship game logic."""
 
     def __init__(self, size=8, num_ships=3, title_lines=None):
+        # enemy_view is what the player knows about the enemy board.
+        # player_board is the real board containing the player's ships.
         self.size = size
         self.num_ships = num_ships
         self.enemy_view = [[WATER] * size for _ in range(size)]
@@ -669,6 +679,8 @@ class BattleshipGame:
 
     def _place_ships(self, reveal=False):
         """Randomly place ships."""
+        # Ships are stored as coordinate pairs in a set, which makes
+        # hit-checking and removal simple.
         ships = set()
         while len(ships) < self.num_ships:
             r = random.randint(0, self.size - 1)
@@ -689,6 +701,8 @@ class BattleshipGame:
 
     def play(self):
         """Main loop."""
+        # The loop alternates: draw screen -> player turn -> enemy turn
+        # until one fleet has no ships left.
         while self.player_ships and self.enemy_ships:
             clear_screen()
 
@@ -712,6 +726,8 @@ class BattleshipGame:
 
     def _player_turn(self):
         """Ask player for input and resolve strike."""
+        # The player types coordinates like A1. This method validates the
+        # input, prevents duplicate shots, and updates the enemy view.
         guess = input(
             Fore.YELLOW + "\nEnter position (e.g., A1) or Q to quit: "
             + Style.RESET_ALL
@@ -761,6 +777,8 @@ class BattleshipGame:
 
     def _enemy_turn(self):
         """Enemy AI randomly fires at player fleet."""
+        # This is a simple AI: keep picking random coordinates until it finds
+        # one that has not been used before.
         while True:
             r = random.randint(0, self.size - 1)
             c = random.randint(0, self.size - 1)
@@ -781,6 +799,8 @@ class BattleshipGame:
 
     def _show_status(self, current_turn="Player"):
         """Show compact status info."""
+        # The status bar gives a quick summary without forcing the player to
+        # count ships manually on the boards.
         enemy_left = len(self.enemy_ships)
         player_left = len(self.player_ships)
 
@@ -827,6 +847,7 @@ class BattleshipGame:
 
 # ========= 3) Run Game =========
 if __name__ == "__main__":
+    # Static title art and ship art used by the welcome and setup screens.
     title_lines = [
         ("██████   █████  ████████ ████████ ██      ███████ ███████ "
          "██   ██ ██ ██████  ███████"),
