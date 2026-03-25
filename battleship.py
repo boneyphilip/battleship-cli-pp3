@@ -610,6 +610,8 @@ LEFT_TITLE = "Enemy Fleet"
 RIGHT_TITLE = "Your Fleet"
 CELL_VISUAL = 3
 GAP_BETWEEN_BOARDS = " " * 8
+GAME_UI_WIDTH = 118
+STATUS_UI_WIDTH = 96
 
 
 def clear_screen():
@@ -630,6 +632,15 @@ def pad_visual(s: str, width: int) -> str:
     if vis < 0:
         vis = len(strip_ansi(s))
     return s + " " * max(0, width - vis)
+
+
+def center_visual(text: str, width: int) -> str:
+    """Center text using terminal display width, not Python string length."""
+    vis = wcswidth(strip_ansi(text))
+    if vis < 0:
+        vis = len(strip_ansi(text))
+    left_pad = max(0, (width - vis) // 2)
+    return (" " * left_pad) + text
 
 
 def format_cell(symbol: str) -> str:
@@ -669,13 +680,13 @@ def build_board_block(
 
 
 def display_boards(enemy_view: list[list[str]], player_board: list[list[str]]):
-    """Print enemy + player boards side-by-side."""
-    # The player sees both boards at once: enemy guesses on the left and
-    # their own fleet on the right.
+    """Print enemy + player boards side-by-side centered correctly."""
     left_block = build_board_block(LEFT_TITLE, enemy_view)
     right_block = build_board_block(RIGHT_TITLE, player_board)
+
     for left_row, right_row in zip(left_block, right_block):
-        print(left_row + GAP_BETWEEN_BOARDS + right_row)
+        combined = left_row + GAP_BETWEEN_BOARDS + right_row
+        print(center_visual(combined, GAME_UI_WIDTH))
 
 
 class BattleshipGame:
@@ -712,11 +723,9 @@ class BattleshipGame:
         return ships
 
     def _print_ascii_banner(self):
-        """Print title above the boards."""
-        board_width = 3 + (self.size * CELL_VISUAL)
-        total_width = (board_width * 2) + len(GAP_BETWEEN_BOARDS)
+        """Print gameplay title centered to the gameplay canvas."""
         for line in self.title_lines:
-            print(line.center(total_width))
+            print(center_visual(line, GAME_UI_WIDTH))
         print()
 
     def play(self):
@@ -746,11 +755,20 @@ class BattleshipGame:
 
     def _player_turn(self):
         """Ask player for input and resolve strike."""
-        # The player types coordinates like A1. This method validates the
-        # input, prevents duplicate shots, and updates the enemy view.
-        guess = input(
-            Fore.YELLOW + "\nEnter position (e.g., A1) or Q to quit: "
+        command_rule = Fore.YELLOW + "─" * STATUS_UI_WIDTH + Style.RESET_ALL
+        command_title = (
+            Fore.YELLOW + Style.BRIGHT + "TARGET INPUT" + Style.RESET_ALL
+        )
+        prompt_text = (
+            Fore.YELLOW
+            + "Enter position (e.g., A1) or Q to quit: "
             + Style.RESET_ALL
+        )
+
+        print("\n" + center_visual(command_rule, GAME_UI_WIDTH))
+        print(center_visual(command_title, GAME_UI_WIDTH))
+        guess = input(
+            center_visual(prompt_text, GAME_UI_WIDTH)
         ).strip().upper()
 
         if guess == "Q":
@@ -818,9 +836,7 @@ class BattleshipGame:
         return f"💦 Enemy fires at {pos} - Torpedo missed, you evaded!"
 
     def _show_status(self, current_turn="Player"):
-        """Show compact status info."""
-        # The status bar gives a quick summary without forcing the player to
-        # count ships manually on the boards.
+        """Show a wider arcade-style status console under the boards."""
         enemy_left = len(self.enemy_ships)
         player_left = len(self.player_ships)
 
@@ -830,39 +846,137 @@ class BattleshipGame:
         enemy_bar = " ".join([SHIP_CHAR] * enemy_left) if enemy_left else "-"
 
         if current_turn == "Player":
-            turn_text = Fore.CYAN + "🎯 Turn: Player" + Style.RESET_ALL
+            turn_label = (
+                Fore.CYAN
+                + Style.BRIGHT
+                + "PLAYER TURN"
+                + Style.RESET_ALL
+            )
         else:
-            turn_text = Fore.MAGENTA + "👾 Turn: Enemy" + Style.RESET_ALL
+            turn_label = (
+                Fore.MAGENTA
+                + Style.BRIGHT
+                + "ENEMY TURN"
+                + Style.RESET_ALL
+            )
 
-        print(
-            f"{turn_text} | "
-            f"Enemy ships: {enemy_left} {enemy_bar} | "
-            f"Your ships: {player_left} {player_bar}"
+        line_rule = Fore.YELLOW + "─" * STATUS_UI_WIDTH + Style.RESET_ALL
+
+        print("\n" + center_visual(line_rule, GAME_UI_WIDTH))
+
+        line1 = (
+            f"Turn: {turn_label}   |   "
+            f"Enemy Ships: {enemy_left}  {enemy_bar}   |   "
+            f"Your Ships: {player_left}  {player_bar}"
         )
-        print(
-            f"Shots - Player: {self.total_player_shots} | "
-            f"Enemy: {self.total_enemy_shots}"
+        print(center_visual(line1, GAME_UI_WIDTH))
+
+        line2 = (
+            Fore.WHITE
+            + f"Shots Fired  |  Player: {self.total_player_shots}   "
+            + f"Enemy: {self.total_enemy_shots}"
+            + Style.RESET_ALL
         )
-        print()
+        print(center_visual(line2, GAME_UI_WIDTH))
+
+        print(center_visual(line_rule, GAME_UI_WIDTH))
 
         if self.player_msg:
-            print(Fore.CYAN + self.player_msg + Style.RESET_ALL)
+            print(
+                center_visual(
+                    Fore.CYAN + self.player_msg + Style.RESET_ALL,
+                    GAME_UI_WIDTH,
+                )
+            )
         if self.enemy_msg:
-            print(Fore.MAGENTA + self.enemy_msg + Style.RESET_ALL)
+            print(
+                center_visual(
+                    Fore.MAGENTA + self.enemy_msg + Style.RESET_ALL,
+                    GAME_UI_WIDTH,
+                )
+            )
 
         legend = (
-            f"{HIT}=Hit   {MISS}=Miss   "
-            f"{WATER}=Water   {SHIP_CHAR}=Player"
+            Fore.YELLOW
+            + "Legend: "
+            + Style.RESET_ALL
+            + f"{HIT}=Hit   {MISS}=Miss   "
+            + f"{WATER}=Water   {SHIP_CHAR}=Your Fleet"
         )
-        print("\n" + Fore.YELLOW + "Legend: " + Style.RESET_ALL + legend)
+        print(center_visual(legend, GAME_UI_WIDTH))
+        print(center_visual(line_rule, GAME_UI_WIDTH))
 
     def _end_screen(self):
-        """Final victory or defeat screen."""
+        """Show final victory or defeat screen in arcade style."""
         clear_screen()
+        self._print_ascii_banner()
+
         if self.enemy_ships and not self.player_ships:
-            print("💀 Game Over: All your ships sunk.")
-        elif self.player_ships and not self.enemy_ships:
-            print("🏆 Victory: All enemy ships sunk! 🎉")
+            lines = [
+                "",
+                Fore.RED + Style.BRIGHT + "MISSION FAILED" + Style.RESET_ALL,
+                "",
+                "Your fleet has been destroyed.",
+                "The enemy controls these waters.",
+                "",
+                (
+                    Fore.YELLOW
+                    + (
+                        "Final Shots Fired - "
+                        f"Player: {self.total_player_shots} | "
+                        f"Enemy: {self.total_enemy_shots}"
+                    )
+                    + Style.RESET_ALL
+                ),
+                "",
+            ]
+        else:
+            lines = [
+                "",
+                Fore.GREEN
+                + Style.BRIGHT
+                + "MISSION ACCOMPLISHED"
+                + Style.RESET_ALL,
+                "",
+                "All enemy ships have been destroyed.",
+                "The battlefield is yours, Commander.",
+                "",
+                (
+                    Fore.YELLOW
+                    + (
+                        "Final Shots Fired - "
+                        f"Player: {self.total_player_shots} | "
+                        f"Enemy: {self.total_enemy_shots}"
+                    )
+                    + Style.RESET_ALL
+                ),
+                "",
+            ]
+
+        panel_width = 76
+        inner_width = panel_width - 2
+        label = " BATTLE RESULT "
+        spare = inner_width - len(label)
+        left = spare // 2
+        right = spare - left
+
+        top = "┌" + ("─" * left) + label + ("─" * right) + "┐"
+        bottom = "└" + ("─" * inner_width) + "┘"
+
+        print(center_visual(top, GAME_UI_WIDTH))
+        for line in lines:
+            vis = wcswidth(strip_ansi(line))
+            if vis < 0:
+                vis = len(strip_ansi(line))
+            padding = max(0, inner_width - vis)
+            print(
+                center_visual(
+                    "│" + line + (" " * padding) + "│",
+                    GAME_UI_WIDTH,
+                )
+            )
+        print(center_visual(bottom, GAME_UI_WIDTH))
+        print()
 
 
 # ========= 3) Run Game =========
@@ -882,7 +996,7 @@ if __name__ == "__main__":
     ]
 
     ship_art = r"""
-    ⣠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⣠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠰⠶⢿⡶⠦⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⢀⣀⣿⣿⣿⣿⣿⣿⡇⢀⠀⢀⡀⠀⣀⣀⣠⣀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠉⠻⠿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣶⣿⣿⣶⣶⣾⣧⣤⣴⣆⣀⢀⣤⡄⠀⠀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
