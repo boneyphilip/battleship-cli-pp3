@@ -836,7 +836,7 @@ class BattleshipGame:
         return f"💦 Enemy fires at {pos} - Torpedo missed, you evaded!"
 
     def _show_status(self, current_turn="Player"):
-        """Show a wider arcade-style status console under the boards."""
+        """Show a three-section arcade status console under the boards."""
         enemy_left = len(self.enemy_ships)
         player_left = len(self.player_ships)
 
@@ -846,39 +846,84 @@ class BattleshipGame:
         enemy_bar = " ".join([SHIP_CHAR] * enemy_left) if enemy_left else "-"
 
         if current_turn == "Player":
-            turn_label = (
+            turn_value = (
                 Fore.CYAN
                 + Style.BRIGHT
                 + "PLAYER TURN"
                 + Style.RESET_ALL
             )
         else:
-            turn_label = (
+            turn_value = (
                 Fore.MAGENTA
                 + Style.BRIGHT
                 + "ENEMY TURN"
                 + Style.RESET_ALL
             )
 
+        col1 = 22
+        col2 = 40
+        col3 = 28
+
         line_rule = Fore.YELLOW + "─" * STATUS_UI_WIDTH + Style.RESET_ALL
 
+        header_left = (
+            Fore.YELLOW + Style.BRIGHT + "TURN STATUS" + Style.RESET_ALL
+        )
+        header_mid = (
+            Fore.YELLOW + Style.BRIGHT + "FLEET STATUS" + Style.RESET_ALL
+        )
+        header_right = (
+            Fore.YELLOW + Style.BRIGHT + "SHOTS FIRED" + Style.RESET_ALL
+        )
+
+        header_line = (
+            pad_visual(header_left, col1)
+            + " | "
+            + pad_visual(header_mid, col2)
+            + " | "
+            + pad_visual(header_right, col3)
+        )
+
+        row1 = (
+            pad_visual(turn_value, col1)
+            + " | "
+            + pad_visual(
+                Fore.WHITE
+                + f"Enemy Ships: {enemy_left}  {enemy_bar}"
+                + Style.RESET_ALL,
+                col2,
+            )
+            + " | "
+            + pad_visual(
+                Fore.WHITE
+                + f"Player: {self.total_player_shots}"
+                + Style.RESET_ALL,
+                col3,
+            )
+        )
+
+        row2 = (
+            pad_visual("", col1)
+            + " | "
+            + pad_visual(
+                Fore.WHITE
+                + f"Your Ships:  {player_left}  {player_bar}"
+                + Style.RESET_ALL,
+                col2,
+            )
+            + " | "
+            + pad_visual(
+                Fore.WHITE
+                + f"Enemy:  {self.total_enemy_shots}"
+                + Style.RESET_ALL,
+                col3,
+            )
+        )
+
         print("\n" + center_visual(line_rule, GAME_UI_WIDTH))
-
-        line1 = (
-            f"Turn: {turn_label}   |   "
-            f"Enemy Ships: {enemy_left}  {enemy_bar}   |   "
-            f"Your Ships: {player_left}  {player_bar}"
-        )
-        print(center_visual(line1, GAME_UI_WIDTH))
-
-        line2 = (
-            Fore.WHITE
-            + f"Shots Fired  |  Player: {self.total_player_shots}   "
-            + f"Enemy: {self.total_enemy_shots}"
-            + Style.RESET_ALL
-        )
-        print(center_visual(line2, GAME_UI_WIDTH))
-
+        print(center_visual(header_line, GAME_UI_WIDTH))
+        print(center_visual(row1, GAME_UI_WIDTH))
+        print(center_visual(row2, GAME_UI_WIDTH))
         print(center_visual(line_rule, GAME_UI_WIDTH))
 
         if self.player_msg:
