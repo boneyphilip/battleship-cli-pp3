@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import random
+import time
 from colorama import init, Fore, Style
 from wcwidth import wcswidth
 
@@ -706,6 +707,8 @@ class BattleshipGame:
         self.total_enemy_shots = 0
         self.player_msg = ""
         self.enemy_msg = ""
+        self.battle_message = ""
+        self.last_player_target = ""
         self.title_lines = title_lines or []
 
     def _place_ships(self, reveal=False):
@@ -728,33 +731,8 @@ class BattleshipGame:
             print(center_visual(line, GAME_UI_WIDTH))
         print()
 
-    def play(self):
-        """Main loop."""
-        # The loop alternates: draw screen -> player turn -> enemy turn
-        # until one fleet has no ships left.
-        while self.player_ships and self.enemy_ships:
-            clear_screen()
-
-            self._print_ascii_banner()
-            display_boards(self.enemy_view, self.player_board)
-            self._show_status(current_turn="Player")
-
-            self._player_turn()
-            if not self.enemy_ships:
-                break
-
-            self.enemy_msg = self._enemy_turn()
-
-            clear_screen()
-
-            self._print_ascii_banner()
-            display_boards(self.enemy_view, self.player_board)
-            self._show_status(current_turn="Enemy")
-
-        self._end_screen()
-
-    def _player_turn(self):
-        """Ask player for input and resolve strike."""
+    def _show_target_console(self, prompt: bool = False):
+        """Render the battle message area above the target input console."""
         command_rule = Fore.YELLOW + "─" * STATUS_UI_WIDTH + Style.RESET_ALL
         command_title = (
             Fore.YELLOW + Style.BRIGHT + "TARGET INPUT" + Style.RESET_ALL
@@ -765,53 +743,167 @@ class BattleshipGame:
             + Style.RESET_ALL
         )
 
-        print("\n" + center_visual(command_rule, GAME_UI_WIDTH))
-        print(center_visual(command_title, GAME_UI_WIDTH))
-        guess = input(
-            center_visual(prompt_text, GAME_UI_WIDTH)
-        ).strip().upper()
+        print()
 
+        # Battle message goes in the empty area ABOVE the target input strip
+        if self.battle_message:
+            print(center_visual(self.battle_message, GAME_UI_WIDTH))
+        else:
+            print(center_visual(" ", GAME_UI_WIDTH))
+
+        # One spacer line so the message breathes a bit
+        print(center_visual(" ", GAME_UI_WIDTH))
+
+        # Target input strip starts below
+        print(center_visual(command_rule, GAME_UI_WIDTH))
+        print(center_visual(command_title, GAME_UI_WIDTH))
+
+        if prompt:
+            return (
+                input(center_visual(prompt_text, GAME_UI_WIDTH))
+                .strip()
+                .upper()
+            )
+
+        print(center_visual(" ", GAME_UI_WIDTH))
+        return None
+
+    def _render_game_frame(
+        self, current_turn="Player", prompt: bool = False
+    ):
+        """Draw the complete gameplay frame."""
+        clear_screen()
+        self._print_ascii_banner()
+        display_boards(self.enemy_view, self.player_board)
+        self._show_status(current_turn=current_turn)
+        return self._show_target_console(prompt=prompt)
+
+    def _show_battle_message(
+        self,
+        message: str,
+        current_turn="Player",
+        delay: float = 1.15,
+    ):
+        """Show one temporary battle message above target input."""
+        self.battle_message = message
+        self._render_game_frame(current_turn=current_turn, prompt=False)
+        time.sleep(delay)
+        self.battle_message = ""
+
+    def _flash_warning(self, message: str, current_turn="Enemy"):
+        """Blink a warning message with a slower dramatic pace."""
+        warning_text = Fore.RED + Style.BRIGHT + message + Style.RESET_ALL
+
+        for _ in range(2):
+            self.battle_message = warning_text
+            self._render_game_frame(current_turn=current_turn, prompt=False)
+            time.sleep(0.28)
+
+            self.battle_message = ""
+            self._render_game_frame(current_turn=current_turn, prompt=False)
+            time.sleep(0.14)
+
+        self.battle_message = warning_text
+        self._render_game_frame(current_turn=current_turn, prompt=False)
+        time.sleep(0.80)
+        self.battle_message = ""
+
+    def play(self):
+        """Main loop with sequential turn pacing and battle messages."""
+        while self.player_ships and self.enemy_ships:
+            self.battle_message = ""
+            guess = self._render_game_frame(current_turn="Player", prompt=True)
+
+            result = self._player_turn(guess)
+
+            if result == "quit":
+                return
+
+            if result == "invalid":
+                self._show_battle_message(
+                    Fore.RED + self.player_msg + Style.RESET_ALL,
+                    current_turn="Player",
+                    delay=1.0,
+                )
+                continue
+
+            self._show_battle_message(
+                Fore.YELLOW
+                + f"🔻 Launching torpedo at {self.last_player_target}..."
+                + Style.RESET_ALL,
+                current_turn="Player",
+                delay=0.70,
+            )
+
+            self._show_battle_message(
+                Fore.CYAN + self.player_msg + Style.RESET_ALL,
+                current_turn="Player",
+                delay=1.25,
+            )
+
+            if not self.enemy_ships:
+                break
+
+            self._flash_warning(
+                "⚠ Enemy torpedo incoming...",
+                current_turn="Enemy",
+            )
+
+            self.enemy_msg = self._enemy_turn()
+
+            self._show_battle_message(
+                Fore.MAGENTA + self.enemy_msg + Style.RESET_ALL,
+                current_turn="Enemy",
+                delay=1.25,
+            )
+
+        self._end_screen()
+
+    def _player_turn(self, guess: str):
+        """Resolve player strike after input is already collected."""
         if guess == "Q":
             clear_screen()
             print("👋 Game ended by user.")
-            raise SystemExit
+            return "quit"
 
         if len(guess) < 2:
             self.player_msg = "❌ Format must be Letter+Number (e.g., A1)."
-            return
+            return "invalid"
 
         row_letter, digits = guess[0], guess[1:]
         if not digits.isdigit():
             self.player_msg = "❌ Column must be a number (e.g., A1)."
-            return
+            return "invalid"
 
         r = ord(row_letter) - 65
         c = int(digits) - 1
         if not (0 <= r < self.size and 0 <= c < self.size):
             self.player_msg = (
-                f"❌ Coordinates must be "
+                "❌ Coordinates must be "
                 f"A-{chr(64 + self.size)} + 1-{self.size}."
             )
-            return
+            return "invalid"
 
         if self.enemy_view[r][c] in (MISS, HIT):
             self.player_msg = "⚠️ Already tried that sector."
-            return
+            return "invalid"
 
+        self.last_player_target = f"{row_letter}{c + 1}"
         self.total_player_shots += 1
+
         if (r, c) in self.enemy_ships:
             self.enemy_view[r][c] = HIT
             self.enemy_ships.remove((r, c))
             self.player_msg = (
-                f"💥 Direct Hit! Enemy ship damaged at "
-                f"{row_letter}{c + 1}!"
+                f"💥 Direct hit at {row_letter}{c + 1}! Enemy ship damaged!"
             )
         else:
             self.enemy_view[r][c] = MISS
             self.player_msg = (
-                f"💦 Torpedo missed at {row_letter}{c + 1}, "
-                "enemy evaded!"
+                f"💦 Torpedo missed at {row_letter}{c + 1}, enemy evaded!"
             )
+
+        return "ok"
 
     def _enemy_turn(self):
         """Enemy AI randomly fires at player fleet."""
@@ -925,21 +1017,6 @@ class BattleshipGame:
         print(center_visual(row1, GAME_UI_WIDTH))
         print(center_visual(row2, GAME_UI_WIDTH))
         print(center_visual(line_rule, GAME_UI_WIDTH))
-
-        if self.player_msg:
-            print(
-                center_visual(
-                    Fore.CYAN + self.player_msg + Style.RESET_ALL,
-                    GAME_UI_WIDTH,
-                )
-            )
-        if self.enemy_msg:
-            print(
-                center_visual(
-                    Fore.MAGENTA + self.enemy_msg + Style.RESET_ALL,
-                    GAME_UI_WIDTH,
-                )
-            )
 
         legend = (
             Fore.YELLOW
