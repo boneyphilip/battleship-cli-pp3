@@ -1,4 +1,6 @@
 ﻿# Battleship Game
+# This file contains both the interface code that draws the terminal screens
+# and the game logic that runs the Battleship match.
 import os
 import re
 import sys
@@ -14,6 +16,7 @@ else:
     import termios
 
 # Initialize colorama (cross-platform color support)
+# `autoreset=True` means each print resets the color automatically.
 init(autoreset=True)
 
 
@@ -22,6 +25,7 @@ class WelcomeScreen:
     """Arcade-style welcome screen with inline setup boxes."""
 
     def __init__(self, title_lines, ship_art, width=100):
+        # Save the artwork and keep the UI wide enough for the board layout.
         self.title_lines = title_lines
         self.ship_art = ship_art
         self.width = max(width, 118)
@@ -36,6 +40,7 @@ class WelcomeScreen:
 
     def visible_width(self, text: str) -> int:
         """Return visible width of text, ignoring ANSI color codes."""
+        # `wcswidth` is better than `len` for emojis and wide characters.
         clean_text = self.strip_ansi(text)
         width = wcswidth(clean_text)
         return len(clean_text) if width < 0 else width
@@ -125,6 +130,8 @@ class WelcomeScreen:
         panel = [top]
 
         for line in lines:
+            # Pad each content line so every row in the panel has the same
+            # width before the right border is added.
             padded = self.pad_line(line, inner_width, align=align)
             row = (
                 border_color
@@ -194,6 +201,8 @@ class WelcomeScreen:
 
         max_lines = max(len(left_panel), len(right_panel))
 
+        # Add blank rows to the shorter panel so both panels end up with the
+        # same height and can be zipped together cleanly.
         while len(left_panel) < max_lines:
             left_panel.insert(-1, "│" + (" " * (panel_width - 2)) + "│")
         while len(right_panel) < max_lines:
@@ -342,6 +351,8 @@ class WelcomeScreen:
         """Show original ship art inside a bigger box."""
         art_lines = ["", ""]
         for line in self.ship_art.splitlines():
+            # Ignore empty lines from the multiline string so the artwork
+            # stays tidy inside the panel.
             if line.strip():
                 art_lines.append(Fore.GREEN + line + Style.RESET_ALL)
         art_lines.extend(["", ""])
@@ -522,6 +533,7 @@ class WelcomeScreen:
     # ----- Mission Briefing -----
     def mission_briefing(self, size, ships):
         """Show tighter premium-style mission briefing."""
+        # Convert the final row number into a letter, for example 8 -> H.
         max_row = chr(64 + size)
 
         left_lines = [
@@ -602,11 +614,13 @@ class WelcomeScreen:
 
 # ========= 2) Battleship Game =========
 # Emoji constants
+# These symbols are reused across the boards and status messages.
 WATER = "🌊"
 MISS = "💦"
 HIT = "💥"
 SHIP_CHAR = "🚢"
 
+# Layout constants keep the terminal UI consistent in one place.
 LEFT_TITLE = "Enemy Fleet"
 RIGHT_TITLE = "Your Fleet"
 CELL_VISUAL = 3
@@ -617,6 +631,7 @@ STATUS_UI_WIDTH = 96
 
 def clear_screen():
     """Clear terminal window (Windows & Unix)."""
+    # Windows uses `cls`, while Linux/macOS terminals usually use `clear`.
     os.system("cls" if os.name == "nt" else "clear")
 
 
@@ -661,6 +676,8 @@ def build_board_block(
     lines = []
 
     label = f" {title_text} "
+    # Calculate how much border should go on the left and right of the title
+    # so the title looks centered in the top border.
     spare = inner_width - len(strip_ansi(label))
     left = max(0, spare // 2)
     right = max(0, spare - left)
@@ -670,6 +687,7 @@ def build_board_block(
     lines.append("│" + "   " + nums + "│")
 
     for r in range(size):
+        # Convert row index 0, 1, 2... into A, B, C...
         row_label = chr(65 + r)
         row_cells = "".join(format_cell(ch) for ch in grid_rows[r])
         content = f"{row_label}  {row_cells}"
@@ -682,6 +700,8 @@ def build_board_block(
 
 def display_boards(enemy_view: list[list[str]], player_board: list[list[str]]):
     """Print enemy + player boards side-by-side centered correctly."""
+    # The enemy board only shows what the player has discovered so far,
+    # while the player board shows their actual ship positions too.
     left_block = build_board_block(LEFT_TITLE, enemy_view)
     right_block = build_board_block(RIGHT_TITLE, player_board)
 
@@ -698,10 +718,13 @@ class BattleshipGame:
         # player_board is the real board containing the player's ships.
         self.size = size
         self.num_ships = num_ships
+        # Build two boards full of water to start with.
         self.enemy_view = [[WATER] * size for _ in range(size)]
         self.player_board = [[WATER] * size for _ in range(size)]
+        # Ship coordinates are also stored in sets for quick hit detection.
         self.enemy_ships = self._place_ships()
         self.player_ships = self._place_ships(reveal=True)
+        # The enemy remembers its previous shots so it does not repeat them.
         self.enemy_tried = set()
         self.total_player_shots = 0
         self.total_enemy_shots = 0
@@ -717,10 +740,13 @@ class BattleshipGame:
         # hit-checking and removal simple.
         ships = set()
         while len(ships) < self.num_ships:
+            # Pick a random row and column somewhere on the board.
             r = random.randint(0, self.size - 1)
             c = random.randint(0, self.size - 1)
+            # Using a set means duplicate positions are ignored automatically.
             ships.add((r, c))
         if reveal:
+            # Only the player's ships are shown on the visible player board.
             for r, c in ships:
                 self.player_board[r][c] = SHIP_CHAR
         return ships
@@ -733,6 +759,8 @@ class BattleshipGame:
 
     def _show_target_console(self, prompt: bool = False):
         """Render the battle message area above the target input console."""
+        # This console is reused both for asking the player for input and for
+        # simply showing temporary messages between turns.
         command_rule = Fore.YELLOW + "─" * STATUS_UI_WIDTH + Style.RESET_ALL
         command_title = (
             Fore.YELLOW + Style.BRIGHT + "TARGET INPUT" + Style.RESET_ALL
@@ -772,6 +800,8 @@ class BattleshipGame:
         self, current_turn="Player", prompt: bool = False
     ):
         """Draw the complete gameplay frame."""
+        # A full frame redraw keeps the terminal UI simple: clear everything
+        # and print the current game state from scratch.
         clear_screen()
         self._print_ascii_banner()
         display_boards(self.enemy_view, self.player_board)
@@ -785,6 +815,7 @@ class BattleshipGame:
         delay: float = 1.15,
     ):
         """Show one temporary battle message above target input."""
+        # Save the message, draw it, wait briefly, then clear it again.
         self.battle_message = message
         self._render_game_frame(current_turn=current_turn, prompt=False)
         time.sleep(delay)
@@ -795,6 +826,8 @@ class BattleshipGame:
         warning_text = Fore.RED + Style.BRIGHT + message + Style.RESET_ALL
 
         for _ in range(2):
+            # Alternate between showing and hiding the warning to create a
+            # simple blinking effect.
             self.battle_message = warning_text
             self._render_game_frame(current_turn=current_turn, prompt=False)
             time.sleep(0.28)
@@ -810,6 +843,7 @@ class BattleshipGame:
 
     def play(self):
         """Main loop with sequential turn pacing and battle messages."""
+        # Keep looping until either the player or the enemy has no ships left.
         while self.player_ships and self.enemy_ships:
             self.battle_message = ""
             guess = self._render_game_frame(current_turn="Player", prompt=True)
@@ -820,6 +854,7 @@ class BattleshipGame:
                 return
 
             if result == "invalid":
+                # Invalid input does not cost the player a turn.
                 self._show_battle_message(
                     Fore.RED + self.player_msg + Style.RESET_ALL,
                     current_turn="Player",
@@ -842,6 +877,7 @@ class BattleshipGame:
             )
 
             if not self.enemy_ships:
+                # Stop immediately if the player has destroyed the last ship.
                 break
 
             self._flash_warning(
@@ -870,11 +906,14 @@ class BattleshipGame:
             self.player_msg = "❌ Format must be Letter+Number (e.g., A1)."
             return "invalid"
 
+        # Split a guess like "B7" into its row part and column part.
         row_letter, digits = guess[0], guess[1:]
         if not digits.isdigit():
             self.player_msg = "❌ Column must be a number (e.g., A1)."
             return "invalid"
 
+        # Convert from user-friendly coordinates into Python list indexes.
+        # Example: A1 becomes row 0, column 0.
         r = ord(row_letter) - 65
         c = int(digits) - 1
         if not (0 <= r < self.size and 0 <= c < self.size):
@@ -885,6 +924,7 @@ class BattleshipGame:
             return "invalid"
 
         if self.enemy_view[r][c] in (MISS, HIT):
+            # The enemy view stores old results, so it can block repeats.
             self.player_msg = "⚠️ Already tried that sector."
             return "invalid"
 
@@ -892,12 +932,15 @@ class BattleshipGame:
         self.total_player_shots += 1
 
         if (r, c) in self.enemy_ships:
+            # A hit updates the visible enemy board and removes that ship from
+            # the hidden set of remaining enemy ships.
             self.enemy_view[r][c] = HIT
             self.enemy_ships.remove((r, c))
             self.player_msg = (
                 f"💥 Direct hit at {row_letter}{c + 1}! Enemy ship damaged!"
             )
         else:
+            # A miss is still recorded so the player sees where they fired.
             self.enemy_view[r][c] = MISS
             self.player_msg = (
                 f"💦 Torpedo missed at {row_letter}{c + 1}, enemy evaded!"
@@ -920,10 +963,12 @@ class BattleshipGame:
         pos = f"{chr(65 + r)}{c + 1}"
 
         if (r, c) in self.player_ships:
+            # Update the real player board so the hit appears on screen.
             self.player_board[r][c] = HIT
             self.player_ships.remove((r, c))
             return f"💥 Enemy fires at {pos} - Direct Hit!"
 
+        # If the enemy misses, mark that square as a miss on the player board.
         self.player_board[r][c] = MISS
         return f"💦 Enemy fires at {pos} - Torpedo missed, you evaded!"
 
@@ -932,6 +977,7 @@ class BattleshipGame:
         enemy_left = len(self.enemy_ships)
         player_left = len(self.player_ships)
 
+        # Show remaining ships as repeated ship icons for a quick visual read.
         player_bar = (
             " ".join([SHIP_CHAR] * player_left) if player_left else "-"
         )
@@ -956,6 +1002,7 @@ class BattleshipGame:
         col2 = 40
         col3 = 28
 
+        # Fixed column widths keep the status panel tidy and aligned.
         line_rule = Fore.YELLOW + "─" * STATUS_UI_WIDTH + Style.RESET_ALL
 
         header_left = (
@@ -1033,6 +1080,7 @@ class BattleshipGame:
         clear_screen()
         self._print_ascii_banner()
 
+        # Choose the final message based on which side still has ships.
         if self.enemy_ships and not self.player_ships:
             lines = [
                 "",
@@ -1087,6 +1135,8 @@ class BattleshipGame:
 
         print(center_visual(top, GAME_UI_WIDTH))
         for line in lines:
+            # Measure the visible width so colored text still fits neatly
+            # inside the result panel.
             vis = wcswidth(strip_ansi(line))
             if vis < 0:
                 vis = len(strip_ansi(line))
@@ -1124,11 +1174,14 @@ if __name__ == "__main__":
 ⠉⠻⠿⣿⣿⣿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣽⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣶⣿⣿⣶⣶⣾⣧⣤⣴⣆⣀⢀⣤⡄⠀⠀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 """
 
+    # Run the setup screens first so the player can choose the board size
+    # and number of ships before the actual battle starts.
     ws = WelcomeScreen(title_lines, ship_art, width=100)
     ws.show_title()
     ws.show_ship()
     size, ships = ws.get_inputs()
     ws.mission_briefing(size, ships)
 
+    # Create the game object with the chosen settings, then begin the match.
     game = BattleshipGame(size=size, num_ships=ships, title_lines=title_lines)
     game.play()
