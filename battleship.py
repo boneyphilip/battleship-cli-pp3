@@ -74,6 +74,7 @@ class WelcomeScreen:
 
     def gradient_line(self, text: str) -> str:
         """Apply rainbow gradient across one line of the title."""
+        # The list order controls how the color fades across the title text.
         colors = [
             Fore.RED,
             Fore.MAGENTA,
@@ -306,6 +307,8 @@ class WelcomeScreen:
             key = sys.stdin.read(1)
 
             if key == "\x1b":
+                # Arrow keys arrive as escape sequences on Unix terminals, so
+                # we read the next characters to figure out which arrow it was.
                 next1 = sys.stdin.read(1)
                 next2 = sys.stdin.read(1)
                 if next1 == "[":
@@ -331,6 +334,7 @@ class WelcomeScreen:
     # ----- Title -----
     def show_title(self):
         """Show original colorful title and top console strip."""
+        # Start with a clean screen so the title always appears at the top.
         clear_screen()
         print("\n")
 
@@ -579,6 +583,8 @@ class WelcomeScreen:
         self.show_title()
         self.show_ship()
 
+        # Show the story/instructions in two panels so the screen feels like
+        # a game briefing instead of plain text.
         self.print_side_by_side_panels(
             "MISSION BRIEFING",
             left_lines,
@@ -733,6 +739,8 @@ class BattleshipGame:
         self.battle_message = ""
         self.last_player_target = ""
         self.title_lines = title_lines or []
+        # Developer mode keeps test-only commands available during build work.
+        self.dev_mode = True
 
     def _place_ships(self, reveal=False):
         """Randomly place ships."""
@@ -753,6 +761,7 @@ class BattleshipGame:
 
     def _print_ascii_banner(self):
         """Print gameplay title centered to the gameplay canvas."""
+        # Reuse the same title art from the welcome screen during gameplay.
         for line in self.title_lines:
             print(center_visual(line, GAME_UI_WIDTH))
         print()
@@ -765,6 +774,8 @@ class BattleshipGame:
         command_title = (
             Fore.YELLOW + Style.BRIGHT + "TARGET INPUT" + Style.RESET_ALL
         )
+        # Keep the visible prompt simple even when hidden developer commands
+        # are enabled in the background.
         prompt_text = (
             Fore.YELLOW
             + "Enter position (e.g., A1) or Q to quit: "
@@ -862,6 +873,42 @@ class BattleshipGame:
                 )
                 continue
 
+            if result == "cheat_win":
+                self._show_battle_message(
+                    Fore.GREEN + self.player_msg + Style.RESET_ALL,
+                    current_turn="Player",
+                    delay=1.0,
+                )
+                break
+
+            if result == "cheat_lose":
+                self._show_battle_message(
+                    Fore.RED + self.player_msg + Style.RESET_ALL,
+                    current_turn="Player",
+                    delay=1.0,
+                )
+                break
+
+            if result == "cheat_hit":
+                self._show_battle_message(
+                    Fore.CYAN + self.player_msg + Style.RESET_ALL,
+                    current_turn="Player",
+                    delay=1.0,
+                )
+                if not self.enemy_ships:
+                    break
+                continue
+
+            if result == "cheat_enemy_hit":
+                self._show_battle_message(
+                    Fore.MAGENTA + self.player_msg + Style.RESET_ALL,
+                    current_turn="Player",
+                    delay=1.0,
+                )
+                if not self.player_ships:
+                    break
+                continue
+
             self._show_battle_message(
                 Fore.YELLOW
                 + f"🔻 Launching torpedo at {self.last_player_target}..."
@@ -901,6 +948,47 @@ class BattleshipGame:
             clear_screen()
             print("👋 Game ended by user.")
             return "quit"
+
+        if self.dev_mode:
+            # Developer cheat codes help test special game states quickly.
+            if guess == "/WIN":
+                # Removing all enemy ships triggers the win ending.
+                self.enemy_ships.clear()
+                self.player_msg = "🛠 Developer cheat activated: instant win."
+                return "cheat_win"
+
+            if guess == "/LOSE":
+                # Removing all player ships triggers the loss ending.
+                self.player_ships.clear()
+                self.player_msg = "🛠 Developer cheat activated: instant lose."
+                return "cheat_lose"
+
+            if guess == "/PHIT":
+                if self.enemy_ships:
+                    # Grab one enemy ship location and turn it into a hit.
+                    r, c = next(iter(self.enemy_ships))
+                    self.enemy_ships.remove((r, c))
+                    self.enemy_view[r][c] = HIT
+                    self.last_player_target = f"{chr(65 + r)}{c + 1}"
+                    self.total_player_shots += 1
+                    self.player_msg = (
+                        "🛠 Developer cheat: forced player hit at "
+                        f"{self.last_player_target}."
+                    )
+                    return "cheat_hit"
+                self.player_msg = "🛠 No enemy ships left to hit."
+                return "invalid"
+
+            if guess == "/EHIT":
+                if self.player_ships:
+                    # Grab one player ship location and simulate an enemy hit.
+                    r, c = next(iter(self.player_ships))
+                    self.player_ships.remove((r, c))
+                    self.player_board[r][c] = HIT
+                    self.player_msg = "🛠 Developer cheat: forced enemy hit."
+                    return "cheat_enemy_hit"
+                self.player_msg = "🛠 No player ships left to hit."
+                return "invalid"
 
         if len(guess) < 2:
             self.player_msg = "❌ Format must be Letter+Number (e.g., A1)."
@@ -1133,20 +1221,17 @@ class BattleshipGame:
         top = "┌" + ("─" * left) + label + ("─" * right) + "┐"
         bottom = "└" + ("─" * inner_width) + "┘"
 
+        print()
         print(center_visual(top, GAME_UI_WIDTH))
+
+        # Leave a little space inside the panel so the text does not touch
+        # the border directly.
+        content_width = inner_width - 8
+
         for line in lines:
-            # Measure the visible width so colored text still fits neatly
-            # inside the result panel.
-            vis = wcswidth(strip_ansi(line))
-            if vis < 0:
-                vis = len(strip_ansi(line))
-            padding = max(0, inner_width - vis)
-            print(
-                center_visual(
-                    "│" + line + (" " * padding) + "│",
-                    GAME_UI_WIDTH,
-                )
-            )
+            row = "│    " + pad_visual(line, content_width) + "    │"
+            print(center_visual(row, GAME_UI_WIDTH))
+
         print(center_visual(bottom, GAME_UI_WIDTH))
         print()
 
